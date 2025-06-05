@@ -28,6 +28,12 @@
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
+
+                Stackable:
+                <select name="crate${crateCounter}_stackable">
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select><br>
             `;
 
             document.getElementById('crates_container').appendChild(crateDiv);
@@ -57,7 +63,6 @@
             <option value="cm">cm</option>
         </select><br>
 
-        <!-- First Crate always shown -->
         <div id="crates_container">
             <h3>Crate 1</h3>
             Length: <input type="number" name="crate1_length" step="any">
@@ -76,6 +81,12 @@
             <select name="crate1_height_unit">
                 <option value="m">m</option>
                 <option value="cm">cm</option>
+            </select><br>
+
+            Stackable:
+            <select name="crate1_stackable">
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
             </select><br>
         </div>
 
