@@ -33,6 +33,7 @@ def index():
             length_field = f'crate{crate_idx}_length'
             width_field = f'crate{crate_idx}_width'
             height_field = f'crate{crate_idx}_height'
+            stackable_field = f'crate{crate_idx}_stackable'
 
             length_unit_field = f'crate{crate_idx}_length_unit'
             width_unit_field = f'crate{crate_idx}_width_unit'
@@ -44,12 +45,15 @@ def index():
                 w = convert(request.form[width_field], request.form[width_unit_field])
                 h = convert(request.form[height_field], request.form[height_unit_field])
 
+                # Read stackable
+                stackable = request.form[stackable_field] == 'yes'
+
                 # Simple placement: next to previous one in X direction
                 x = sum(c[0] for c in crates)
                 y = 0
                 z = 0
 
-                crates.append((l, w, h, x, y, z))
+                crates.append((l, w, h, x, y, z, stackable))
 
                 crate_idx += 1
             else:
@@ -74,7 +78,7 @@ def index():
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
 
         # Draw all crates
-        for idx, (l, w, h, x, y, z) in enumerate(crates):
+        for idx, (l, w, h, x, y, z, stackable) in enumerate(crates):
             color = colors[idx % len(colors)]
 
             fig.add_trace(go.Mesh3d(
@@ -104,7 +108,6 @@ def index():
 
         plot_div = pyo.plot(fig, output_type='div', include_plotlyjs='cdn')
 
-    # Always return the page
     return render_template('index.html', plot_div=plot_div)
 
 if __name__ == '__main__':
