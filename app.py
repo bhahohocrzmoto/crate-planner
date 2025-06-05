@@ -7,6 +7,7 @@ app = Flask(__name__)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     plot_div = ""
+
     if request.method == 'POST':
         # Read truck dimensions
         truck_length = float(request.form['truck_length'])
@@ -43,8 +44,8 @@ def index():
                 w = convert(request.form[width_field], request.form[width_unit_field])
                 h = convert(request.form[height_field], request.form[height_unit_field])
 
-                # For now → simple placement: each crate placed next to previous one in X direction
-                x = sum(c[0] for c in crates)  # sum of lengths so far
+                # Simple placement: next to previous one in X direction
+                x = sum(c[0] for c in crates)
                 y = 0
                 z = 0
 
@@ -69,24 +70,23 @@ def index():
             color='lightgray'
         ))
 
-        # Example color list (you can add more if you want)
-    colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
-    
-    # Draw all crates
-    for idx, (l, w, h, x, y, z) in enumerate(crates):
-        color = colors[idx % len(colors)]  # cycle through colors
-    
-        fig.add_trace(go.Mesh3d(
-            x=[x, x + l, x + l, x, x, x + l, x + l, x],
-            y=[y, y, y + w, y + w, y, y, y + w, y + w],
-            z=[z, z, z, z, z + h, z + h, z + h, z + h],
-            i=[0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4],
-            j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
-            k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
-            opacity=0.7,
-            color=color
-        ))
+        # Example color list
+        colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
 
+        # Draw all crates
+        for idx, (l, w, h, x, y, z) in enumerate(crates):
+            color = colors[idx % len(colors)]
+
+            fig.add_trace(go.Mesh3d(
+                x=[x, x + l, x + l, x, x, x + l, x + l, x],
+                y=[y, y, y + w, y + w, y, y, y + w, y + w],
+                z=[z, z, z, z, z + h, z + h, z + h, z + h],
+                i=[0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4],
+                j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
+                k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
+                opacity=0.7,
+                color=color
+            ))
 
         # Set scene
         fig.update_layout(
@@ -104,6 +104,7 @@ def index():
 
         plot_div = pyo.plot(fig, output_type='div', include_plotlyjs='cdn')
 
+    # Always return the page
     return render_template('index.html', plot_div=plot_div)
 
 if __name__ == '__main__':
