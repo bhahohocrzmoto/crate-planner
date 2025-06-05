@@ -69,18 +69,24 @@ def index():
             color='lightgray'
         ))
 
-        # Draw all crates
-        for idx, (l, w, h, x, y, z) in enumerate(crates):
-            fig.add_trace(go.Mesh3d(
-                x=[x, x + l, x + l, x, x, x + l, x + l, x],
-                y=[y, y, y + w, y + w, y, y, y + w, y + w],
-                z=[z, z, z, z, z + h, z + h, z + h, z + h],
-                i=[0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4],
-                j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
-                k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
-                opacity=0.7,
-                color='blue'
-            ))
+        # Example color list (you can add more if you want)
+    colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
+    
+    # Draw all crates
+    for idx, (l, w, h, x, y, z) in enumerate(crates):
+        color = colors[idx % len(colors)]  # cycle through colors
+    
+        fig.add_trace(go.Mesh3d(
+            x=[x, x + l, x + l, x, x, x + l, x + l, x],
+            y=[y, y, y + w, y + w, y, y, y + w, y + w],
+            z=[z, z, z, z, z + h, z + h, z + h, z + h],
+            i=[0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4],
+            j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
+            k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
+            opacity=0.7,
+            color=color
+        ))
+
 
         # Set scene
         fig.update_layout(
