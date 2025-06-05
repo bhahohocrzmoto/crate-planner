@@ -13,12 +13,7 @@ def index():
         truck_width = float(request.form['truck_width'])
         truck_height = float(request.form['truck_height'])
 
-        # Read Crate 1 dimensions
-        crate1_length = float(request.form['crate1_length'])
-        crate1_width = float(request.form['crate1_width'])
-        crate1_height = float(request.form['crate1_height'])
-
-        # Read units and convert to meters if needed
+        # Convert function
         def convert(value_str, unit):
             value = float(value_str)
             if unit == 'cm':
@@ -29,14 +24,35 @@ def index():
         truck_width = convert(truck_width, request.form['truck_width_unit'])
         truck_height = convert(truck_height, request.form['truck_height_unit'])
 
-        crate1_length = convert(crate1_length, request.form['crate1_length_unit'])
-        crate1_width = convert(crate1_width, request.form['crate1_width_unit'])
-        crate1_height = convert(crate1_height, request.form['crate1_height_unit'])
+        # Now loop over crates:
+        crates = []
+        crate_idx = 1
 
-        # Simple placement: crate at (0,0,0)
-        crates = [
-            (crate1_length, crate1_width, crate1_height, 0, 0, 0)
-        ]
+        while True:
+            length_field = f'crate{crate_idx}_length'
+            width_field = f'crate{crate_idx}_width'
+            height_field = f'crate{crate_idx}_height'
+
+            length_unit_field = f'crate{crate_idx}_length_unit'
+            width_unit_field = f'crate{crate_idx}_width_unit'
+            height_unit_field = f'crate{crate_idx}_height_unit'
+
+            if length_field in request.form:
+                # Read crate dimensions
+                l = convert(request.form[length_field], request.form[length_unit_field])
+                w = convert(request.form[width_field], request.form[width_unit_field])
+                h = convert(request.form[height_field], request.form[height_unit_field])
+
+                # For now → simple placement: each crate placed next to previous one in X direction
+                x = sum(c[0] for c in crates)  # sum of lengths so far
+                y = 0
+                z = 0
+
+                crates.append((l, w, h, x, y, z))
+
+                crate_idx += 1
+            else:
+                break
 
         # Build figure
         fig = go.Figure()
@@ -53,7 +69,7 @@ def index():
             color='lightgray'
         ))
 
-        # Draw crates
+        # Draw all crates
         for idx, (l, w, h, x, y, z) in enumerate(crates):
             fig.add_trace(go.Mesh3d(
                 x=[x, x + l, x + l, x, x, x + l, x + l, x],
