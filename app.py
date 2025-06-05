@@ -30,14 +30,6 @@ def index():
         crates = []
         crate_idx = 1
 
-        # Placement cursors
-        current_x = 0
-        current_y = 0
-        current_z = 0
-
-        current_row_height = 0
-        current_layer_height = 0
-
         while True:
             length_field = f'crate{crate_idx}_length'
             width_field = f'crate{crate_idx}_width'
@@ -56,67 +48,44 @@ def index():
 
                 stackable = request.form[stackable_field] == 'yes'
 
-                # Check if fits in current row
-                if current_x + l <= truck_length and current_y + w <= truck_width and current_z + h <= truck_height:
-                    # Place in current row
-                    x = current_x
-                    y = current_y
-                    z = current_z
+                # Now try to place the crate without collision:
+                placed = False
+                step = 0.1  # step size → smaller = more accurate, larger = faster
 
-                    crates.append((l, w, h, x, y, z, stackable))
+                for z_try in range(int(truck_height / step)):
+                    z_pos = z_try * step
+                    for y_try in range(int(truck_width / step)):
+                        y_pos = y_try * step
+                        for x_try in range(int(truck_length / step)):
+                            x_pos = x_try * step
 
-                    # Move x cursor
-                    current_x += l
+                            # Check boundaries:
+                            if x_pos + l > truck_length or y_pos + w > truck_width or z_pos + h > truck_height:
+                                continue
 
-                    # Update row height if needed
-                    if h > current_row_height:
-                        current_row_height = h
-                else:
-                    # Need to move to new row
-                    current_x = 0
-                    current_y += current_row_height
+                            # Check for collision with existing crates:
+                            collision = False
+                            for c in crates:
+                                cx, cy, cz, cl, cw, ch = c[3], c[4], c[5], c[0], c[1], c[2]
 
-                    # Reset row height
-                    current_row_height = 0
+                                if (x_pos < cx + cl and x_pos + l > cx) and \
+                                   (y_pos < cy + cw and y_pos + w > cy) and \
+                                   (z_pos < cz + ch and z_pos + h > cz):
+                                    collision = True
+                                    break
 
-                    # Now check if fits in new row
-                    if current_x + l <= truck_length and current_y + w <= truck_width and current_z + h <= truck_height:
-                        x = current_x
-                        y = current_y
-                        z = current_z
+                            if not collision:
+                                # Place the crate!
+                                crates.append((l, w, h, x_pos, y_pos, z_pos, stackable))
+                                placed = True
+                                break
+                        if placed:
+                            break
+                    if placed:
+                        break
 
-                        crates.append((l, w, h, x, y, z, stackable))
-
-                        current_x += l
-                        current_row_height = h
-                    else:
-                        # Need to move to new layer
-                        current_x = 0
-                        current_y = 0
-                        current_z += current_layer_height
-
-                        # Reset layer height and row height
-                        current_layer_height = 0
-                        current_row_height = 0
-
-                        # Now check if fits in new layer
-                        if current_x + l <= truck_length and current_y + w <= truck_width and current_z + h <= truck_height:
-                            x = current_x
-                            y = current_y
-                            z = current_z
-
-                            crates.append((l, w, h, x, y, z, stackable))
-
-                            current_x += l
-                            current_row_height = h
-                        else:
-                            # No space left
-                            warning += f"⚠️ Crate {crate_idx} does not fit! Truck is full!<br>"
-
-                # Update current layer height (only if crate was placed)
-                if crates and (crates[-1][3], crates[-1][4], crates[-1][5]) == (x, y, z):
-                    if (current_z + h) - current_z > current_layer_height:
-                        current_layer_height = current_row_height
+                if not placed:
+                    warning += f"⚠️ Crate {crate_idx} does not fit! Truck is full!<br>"
 
                 crate_idx += 1
             else:
