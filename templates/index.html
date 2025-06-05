@@ -2,6 +2,37 @@
 <html>
 <head>
     <title>Crate Planner</title>
+    <script>
+        let crateCounter = 1;
+
+        function addCrate() {
+            crateCounter += 1;
+
+            const crateDiv = document.createElement('div');
+            crateDiv.innerHTML = `
+                <h3>Crate ${crateCounter}</h3>
+                Length: <input type="number" name="crate${crateCounter}_length" step="any">
+                <select name="crate${crateCounter}_length_unit">
+                    <option value="m">m</option>
+                    <option value="cm">cm</option>
+                </select><br>
+
+                Width: <input type="number" name="crate${crateCounter}_width" step="any">
+                <select name="crate${crateCounter}_width_unit">
+                    <option value="m">m</option>
+                    <option value="cm">cm</option>
+                </select><br>
+
+                Height: <input type="number" name="crate${crateCounter}_height" step="any">
+                <select name="crate${crateCounter}_height_unit">
+                    <option value="m">m</option>
+                    <option value="cm">cm</option>
+                </select><br>
+            `;
+
+            document.getElementById('crates_container').appendChild(crateDiv);
+        }
+    </script>
 </head>
 <body>
     <h1>Crate Planner</h1>
@@ -26,26 +57,29 @@
             <option value="cm">cm</option>
         </select><br>
 
-        <h3>Crate 1</h3>
-        Length: <input type="number" name="crate1_length" step="any">
-        <select name="crate1_length_unit">
-            <option value="m">m</option>
-            <option value="cm">cm</option>
-        </select><br>
+        <!-- First Crate always shown -->
+        <div id="crates_container">
+            <h3>Crate 1</h3>
+            Length: <input type="number" name="crate1_length" step="any">
+            <select name="crate1_length_unit">
+                <option value="m">m</option>
+                <option value="cm">cm</option>
+            </select><br>
 
-        Width: <input type="number" name="crate1_width" step="any">
-        <select name="crate1_width_unit">
-            <option value="m">m</option>
-            <option value="cm">cm</option>
-        </select><br>
+            Width: <input type="number" name="crate1_width" step="any">
+            <select name="crate1_width_unit">
+                <option value="m">m</option>
+                <option value="cm">cm</option>
+            </select><br>
 
-        Height: <input type="number" name="crate1_height" step="any">
-        <select name="crate1_height_unit">
-            <option value="m">m</option>
-            <option value="cm">cm</option>
-        </select><br>
+            Height: <input type="number" name="crate1_height" step="any">
+            <select name="crate1_height_unit">
+                <option value="m">m</option>
+                <option value="cm">cm</option>
+            </select><br>
+        </div>
 
-        <!-- Placeholder: Here we will add "Add Crate" button later -->
+        <button type="button" onclick="addCrate()">+ Add Crate</button><br><br>
 
         <button type="submit">Run Planner</button>
     </form>
