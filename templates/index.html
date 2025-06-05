@@ -8,14 +8,44 @@
 
     <form method="POST">
         <h3>Truck size</h3>
-        Length: <input type="number" name="truck_length" step="any"><br>
-        Width: <input type="number" name="truck_width" step="any"><br>
-        Height: <input type="number" name="truck_height" step="any"><br>
+        Length: <input type="number" name="truck_length" step="any">
+        <select name="truck_length_unit">
+            <option value="m">m</option>
+            <option value="cm">cm</option>
+        </select><br>
+
+        Width: <input type="number" name="truck_width" step="any">
+        <select name="truck_width_unit">
+            <option value="m">m</option>
+            <option value="cm">cm</option>
+        </select><br>
+
+        Height: <input type="number" name="truck_height" step="any">
+        <select name="truck_height_unit">
+            <option value="m">m</option>
+            <option value="cm">cm</option>
+        </select><br>
 
         <h3>Crate 1</h3>
-        Length: <input type="number" name="crate1_length" step="any"><br>
-        Width: <input type="number" name="crate1_width" step="any"><br>
-        Height: <input type="number" name="crate1_height" step="any"><br>
+        Length: <input type="number" name="crate1_length" step="any">
+        <select name="crate1_length_unit">
+            <option value="m">m</option>
+            <option value="cm">cm</option>
+        </select><br>
+
+        Width: <input type="number" name="crate1_width" step="any">
+        <select name="crate1_width_unit">
+            <option value="m">m</option>
+            <option value="cm">cm</option>
+        </select><br>
+
+        Height: <input type="number" name="crate1_height" step="any">
+        <select name="crate1_height_unit">
+            <option value="m">m</option>
+            <option value="cm">cm</option>
+        </select><br>
+
+        <!-- Placeholder: Here we will add "Add Crate" button later -->
 
         <button type="submit">Run Planner</button>
     </form>
