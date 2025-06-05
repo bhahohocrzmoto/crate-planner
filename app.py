@@ -7,6 +7,7 @@ app = Flask(__name__)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     plot_div = ""
+    warning = ""
 
     if request.method == 'POST':
         # Read truck dimensions
@@ -45,15 +46,43 @@ def index():
                 w = convert(request.form[width_field], request.form[width_unit_field])
                 h = convert(request.form[height_field], request.form[height_unit_field])
 
-                # Read stackable
                 stackable = request.form[stackable_field] == 'yes'
 
-                # Simple placement: next to previous one in X direction
-                x = sum(c[0] for c in crates)
-                y = 0
-                z = 0
+                # NOW → smart placement:
+                # Row by row filling → (x, y, z)
 
-                crates.append((l, w, h, x, y, z, stackable))
+                x_cursor = 0
+                y_cursor = 0
+                z_cursor = 0
+
+                # Try to place at current layer
+                placed = False
+
+                while not placed:
+                    # Check if fits at current position
+                    if x_cursor + l <= truck_length and y_cursor + w <= truck_width and z_cursor + h <= truck_height:
+                        # PLACE the crate here!
+                        crates.append((l, w, h, x_cursor, y_cursor, z_cursor, stackable))
+                        placed = True
+                    else:
+                        # Move to next position
+                        x_cursor += l
+
+                        # If row full → move to next row
+                        if x_cursor + l > truck_length:
+                            x_cursor = 0
+                            y_cursor += w
+
+                        # If width full → move to next layer
+                        if y_cursor + w > truck_width:
+                            x_cursor = 0
+                            y_cursor = 0
+                            z_cursor += h
+
+                        # If height full → STOP
+                        if z_cursor + h > truck_height:
+                            warning += f"⚠️ Crate {crate_idx} does not fit! Truck is full!<br>"
+                            placed = True  # we stop trying for this crate → skip it!
 
                 crate_idx += 1
             else:
@@ -108,7 +137,8 @@ def index():
 
         plot_div = pyo.plot(fig, output_type='div', include_plotlyjs='cdn')
 
-    return render_template('index.html', plot_div=plot_div)
+    # Always return the page
+    return render_template('index.html', plot_div=plot_div, warning=warning)
 
 if __name__ == '__main__':
     app.run(debug=True)
