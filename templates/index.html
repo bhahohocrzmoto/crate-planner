@@ -30,13 +30,29 @@
                 </select><br>
 
                 Stackable:
-                <select name="crate${crateCounter}_stackable">
+                <select name="crate${crateCounter}_stackable" onchange="toggleStackTarget(${crateCounter})">
+                    <option value="no" selected>No</option>
                     <option value="yes">Yes</option>
-                    <option value="no">No</option>
                 </select><br>
+
+                <div id="stack_target_${crateCounter}" style="display: none;">
+                    Which crate should be stacked on top of this crate?
+                    <input type="number" name="crate${crateCounter}_stack_target" min="1" step="1"><br>
+                </div>
             `;
 
             document.getElementById('crates_container').appendChild(crateDiv);
+        }
+
+        function toggleStackTarget(crateNum) {
+            const stackSelect = document.querySelector(`select[name="crate${crateNum}_stackable"]`);
+            const targetDiv = document.getElementById(`stack_target_${crateNum}`);
+
+            if (stackSelect.value === 'yes') {
+                targetDiv.style.display = 'block';
+            } else {
+                targetDiv.style.display = 'none';
+            }
         }
     </script>
 </head>
@@ -84,10 +100,15 @@
             </select><br>
 
             Stackable:
-            <select name="crate1_stackable">
+            <select name="crate1_stackable" onchange="toggleStackTarget(1)">
+                <option value="no" selected>No</option>
                 <option value="yes">Yes</option>
-                <option value="no">No</option>
             </select><br>
+
+            <div id="stack_target_1" style="display: none;">
+                Which crate should be stacked on top of this crate?
+                <input type="number" name="crate1_stack_target" min="1" step="1"><br>
+            </div>
         </div>
 
         <button type="button" onclick="addCrate()">+ Add Crate</button><br><br>
