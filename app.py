@@ -65,8 +65,7 @@ def index():
                 crate['l'],
                 crate['w'],
                 crate['h'],
-                1,  # weight
-                False,  # rotation disabled for now
+                1  # weight
             )
             packer.add_item(item)
 
