@@ -7,101 +7,70 @@ app = Flask(__name__)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     plot_div = ""
-    warning = ""
 
     if request.method == 'POST':
         # Read truck dimensions
-        truck_length = float(request.form['truck_length'])
-        truck_width = float(request.form['truck_width'])
-        truck_height = float(request.form['truck_height'])
-
-        # Convert function
-        def convert(value_str, unit):
-            value = float(value_str)
+        def convert(val, unit):
+            v = float(val)
             if unit == 'cm':
-                return value / 100.0
-            return value
+                v /= 100.0
+            return v
 
-        truck_length = convert(truck_length, request.form['truck_length_unit'])
-        truck_width = convert(truck_width, request.form['truck_width_unit'])
-        truck_height = convert(truck_height, request.form['truck_height_unit'])
+        truck_length = convert(request.form['truck_length'], request.form['truck_length_unit'])
+        truck_width = convert(request.form['truck_width'], request.form['truck_width_unit'])
+        truck_height = convert(request.form['truck_height'], request.form['truck_height_unit'])
 
-        # Now loop over crates:
+        total_crates = int(request.form['total_crates'])
+
         crates = []
-        crate_idx = 1
 
-        while True:
-            length_field = f'crate{crate_idx}_length'
-            width_field = f'crate{crate_idx}_width'
-            height_field = f'crate{crate_idx}_height'
-            stackable_field = f'crate{crate_idx}_stackable'
-            stack_target_field = f'crate{crate_idx}_stack_target'
+        # Read crate info
+        for i in range(1, total_crates + 1):
+            label = request.form.get(f'crate{i}_label', f'Crate {i}')
+            l = convert(request.form[f'crate{i}_length'], request.form[f'crate{i}_length_unit'])
+            w = convert(request.form[f'crate{i}_width'], request.form[f'crate{i}_width_unit'])
+            h = convert(request.form[f'crate{i}_height'], request.form[f'crate{i}_height_unit'])
+            stackable = request.form.get(f'crate{i}_stackable', 'no')
+            stack_target = request.form.get(f'crate{i}_stack_target') if stackable == 'yes' else None
 
-            length_unit_field = f'crate{crate_idx}_length_unit'
-            width_unit_field = f'crate{crate_idx}_width_unit'
-            height_unit_field = f'crate{crate_idx}_height_unit'
+            crates.append({
+                'label': label,
+                'l': l,
+                'w': w,
+                'h': h,
+                'stackable': stackable,
+                'stack_target': stack_target,
+                'x': None, 'y': None, 'z': None
+            })
 
-            if length_field in request.form:
-                # Read crate dimensions
-                l = convert(request.form[length_field], request.form[length_unit_field])
-                w = convert(request.form[width_field], request.form[width_unit_field])
-                h = convert(request.form[height_field], request.form[height_unit_field])
+        # Simple placement algorithm
+        occupied = []  # occupied zones [(x,y,z,w,l,h)]
 
-                stackable = request.form[stackable_field] == 'yes'
+        for idx, crate in enumerate(crates):
+            if crate['stackable'] == 'yes' and crate['stack_target']:
+                target_idx = int(crate['stack_target']) - 1
+                target_crate = crates[target_idx]
 
-                # Read stack target (if any)
-                if stackable and stack_target_field in request.form and request.form[stack_target_field]:
-                    stack_target = int(request.form[stack_target_field])
-                else:
-                    stack_target = None
-
-                # Now try to place the crate without collision:
-                placed = False
-                step = 0.1  # step size → smaller = more accurate, larger = faster
-
-                for z_try in range(int(truck_height / step)):
-                    z_pos = z_try * step
-                    for y_try in range(int(truck_width / step)):
-                        y_pos = y_try * step
-                        for x_try in range(int(truck_length / step)):
-                            x_pos = x_try * step
-
-                            # Check boundaries:
-                            if x_pos + l > truck_length or y_pos + w > truck_width or z_pos + h > truck_height:
-                                continue
-
-                            # Check for collision with existing crates:
-                            collision = False
-                            for c in crates:
-                                cx, cy, cz, cl, cw, ch = c[3], c[4], c[5], c[0], c[1], c[2]
-
-                                if (x_pos < cx + cl and x_pos + l > cx) and \
-                                   (y_pos < cy + cw and y_pos + w > cy) and \
-                                   (z_pos < cz + ch and z_pos + h > cz):
-                                    collision = True
-                                    break
-
-                            if not collision:
-                                # Place the crate!
-                                crates.append((l, w, h, x_pos, y_pos, z_pos, stackable, stack_target))
-                                placed = True
-                                break
-                        if placed:
-                            break
-                    if placed:
-                        break
-
-                if not placed:
-                    warning += f"⚠️ Crate {crate_idx} does not fit! Truck is full!<br>"
-
-                crate_idx += 1
+                crate['x'] = target_crate['x']
+                crate['y'] = target_crate['y']
+                crate['z'] = target_crate['z'] + target_crate['h']
             else:
-                break
+                # place on floor, find next available X position
+                current_x = sum(c['l'] for c in crates[:idx] if c['z'] == 0 or c['z'] is None)
+                crate['x'] = current_x
+                crate['y'] = 0
+                crate['z'] = 0
 
-        # Build figure
+            # Save occupied area
+            occupied.append((
+                crate['x'], crate['y'], crate['z'],
+                crate['l'], crate['w'], crate['h']
+            ))
+
+        # Plot
         fig = go.Figure()
 
-        # Truck boundary (transparent box)
+        # Truck boundary
         fig.add_trace(go.Mesh3d(
             x=[0, truck_length, truck_length, 0, 0, truck_length, truck_length, 0],
             y=[0, 0, truck_width, truck_width, 0, 0, truck_width, truck_width],
@@ -113,13 +82,19 @@ def index():
             color='lightgray'
         ))
 
-        # Example color list
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
 
-        # Draw all crates
-        for idx, (l, w, h, x, y, z, stackable, stack_target) in enumerate(crates):
+        for idx, crate in enumerate(crates):
+            x = crate['x']
+            y = crate['y']
+            z = crate['z']
+            l = crate['l']
+            w = crate['w']
+            h = crate['h']
+            label = crate['label']
             color = colors[idx % len(colors)]
 
+            # Draw crate
             fig.add_trace(go.Mesh3d(
                 x=[x, x + l, x + l, x, x, x + l, x + l, x],
                 y=[y, y, y + w, y + w, y, y, y + w, y + w],
@@ -128,10 +103,21 @@ def index():
                 j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
                 k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
                 opacity=0.7,
-                color=color
+                color=color,
+                name=label
             ))
 
-        # Set scene
+            # Add label as text point
+            fig.add_trace(go.Scatter3d(
+                x=[x + l/2],
+                y=[y + w/2],
+                z=[z + h + 0.1],
+                mode='text',
+                text=[label],
+                textposition='top center',
+                textfont=dict(size=12, color='black')
+            ))
+
         fig.update_layout(
             scene=dict(
                 xaxis_title='Length (m)',
@@ -139,7 +125,7 @@ def index():
                 zaxis_title='Height (m)',
                 xaxis=dict(range=[0, truck_length]),
                 yaxis=dict(range=[0, truck_width]),
-                zaxis=dict(range=[0, truck_height]),
+                zaxis=dict(range=[0, truck_height])
             ),
             title='3D Crate Planner',
             margin=dict(l=0, r=0, b=0, t=50)
@@ -147,8 +133,7 @@ def index():
 
         plot_div = pyo.plot(fig, output_type='div', include_plotlyjs='cdn')
 
-    # Always return the page
-    return render_template('index.html', plot_div=plot_div, warning=warning)
+    return render_template('index.html', plot_div=plot_div)
 
 if __name__ == '__main__':
     app.run(debug=True)
