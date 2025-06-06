@@ -35,6 +35,7 @@ def index():
             width_field = f'crate{crate_idx}_width'
             height_field = f'crate{crate_idx}_height'
             stackable_field = f'crate{crate_idx}_stackable'
+            stack_target_field = f'crate{crate_idx}_stack_target'
 
             length_unit_field = f'crate{crate_idx}_length_unit'
             width_unit_field = f'crate{crate_idx}_width_unit'
@@ -47,6 +48,12 @@ def index():
                 h = convert(request.form[height_field], request.form[height_unit_field])
 
                 stackable = request.form[stackable_field] == 'yes'
+
+                # Read stack target (if any)
+                if stackable and stack_target_field in request.form and request.form[stack_target_field]:
+                    stack_target = int(request.form[stack_target_field])
+                else:
+                    stack_target = None
 
                 # Now try to place the crate without collision:
                 placed = False
@@ -76,7 +83,7 @@ def index():
 
                             if not collision:
                                 # Place the crate!
-                                crates.append((l, w, h, x_pos, y_pos, z_pos, stackable))
+                                crates.append((l, w, h, x_pos, y_pos, z_pos, stackable, stack_target))
                                 placed = True
                                 break
                         if placed:
@@ -110,7 +117,7 @@ def index():
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
 
         # Draw all crates
-        for idx, (l, w, h, x, y, z, stackable) in enumerate(crates):
+        for idx, (l, w, h, x, y, z, stackable, stack_target) in enumerate(crates):
             color = colors[idx % len(colors)]
 
             fig.add_trace(go.Mesh3d(
