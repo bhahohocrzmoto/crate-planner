@@ -7,67 +7,83 @@ app = Flask(__name__)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     plot_div = ""
+    topdown_plot_div = ""
 
     if request.method == 'POST':
         # Read truck dimensions
-        def convert(val, unit):
-            v = float(val)
+        truck_length = float(request.form['truck_length'])
+        truck_width = float(request.form['truck_width'])
+        truck_height = float(request.form['truck_height'])
+
+        def convert(value_str, unit):
+            value = float(value_str)
             if unit == 'cm':
-                v /= 100.0
-            return v
+                return value / 100.0
+            return value
 
-        truck_length = convert(request.form['truck_length'], request.form['truck_length_unit'])
-        truck_width = convert(request.form['truck_width'], request.form['truck_width_unit'])
-        truck_height = convert(request.form['truck_height'], request.form['truck_height_unit'])
+        truck_length = convert(truck_length, request.form['truck_length_unit'])
+        truck_width = convert(truck_width, request.form['truck_width_unit'])
+        truck_height = convert(truck_height, request.form['truck_height_unit'])
 
-        total_crates = int(request.form['total_crates'])
-
+        # Read crates
         crates = []
+        crate_idx = 1
+        while True:
+            length_field = f'crate{crate_idx}_length'
+            width_field = f'crate{crate_idx}_width'
+            height_field = f'crate{crate_idx}_height'
+            label_field = f'crate{crate_idx}_label'
+            stackable_field = f'crate{crate_idx}_stackable'
+            stack_target_field = f'crate{crate_idx}_stack_target'
 
-        # Read crate info
-        for i in range(1, total_crates + 1):
-            label = request.form.get(f'crate{i}_label', f'Crate {i}')
-            l = convert(request.form[f'crate{i}_length'], request.form[f'crate{i}_length_unit'])
-            w = convert(request.form[f'crate{i}_width'], request.form[f'crate{i}_width_unit'])
-            h = convert(request.form[f'crate{i}_height'], request.form[f'crate{i}_height_unit'])
-            stackable = request.form.get(f'crate{i}_stackable', 'no')
-            stack_target = request.form.get(f'crate{i}_stack_target') if stackable == 'yes' else None
+            if length_field in request.form:
+                l = convert(request.form[length_field], request.form[f'crate{crate_idx}_length_unit'])
+                w = convert(request.form[width_field], request.form[f'crate{crate_idx}_width_unit'])
+                h = convert(request.form[height_field], request.form[f'crate{crate_idx}_height_unit'])
+                label = request.form[label_field] or f'Crate {crate_idx}'
+                stackable = request.form[stackable_field]
+                stack_target = request.form[stack_target_field].strip()
 
-            crates.append({
-                'label': label,
-                'l': l,
-                'w': w,
-                'h': h,
-                'stackable': stackable,
-                'stack_target': stack_target,
-                'x': None, 'y': None, 'z': None
-            })
-
-        # Simple placement algorithm
-        occupied = []  # occupied zones [(x,y,z,w,l,h)]
-
-        for idx, crate in enumerate(crates):
-            if crate['stackable'] == 'yes' and crate['stack_target']:
-                target_idx = int(crate['stack_target']) - 1
-                target_crate = crates[target_idx]
-
-                crate['x'] = target_crate['x']
-                crate['y'] = target_crate['y']
-                crate['z'] = target_crate['z'] + target_crate['h']
+                crate = {
+                    'label': label,
+                    'l': l,
+                    'w': w,
+                    'h': h,
+                    'stackable': stackable,
+                    'stack_target': stack_target,
+                    'x': None,
+                    'y': None,
+                    'z': None
+                }
+                crates.append(crate)
+                crate_idx += 1
             else:
-                # place on floor, find next available X position
-                current_x = sum(c['l'] for c in crates[:idx] if c['z'] == 0 or c['z'] is None)
-                crate['x'] = current_x
+                break
+
+        # Place crates
+        placed_crates = []
+        for crate in crates:
+            if crate['stackable'] == 'Yes' and crate['stack_target']:
+                target_label = crate['stack_target']
+                target_crate = next((c for c in placed_crates if c['label'] == target_label), None)
+                if target_crate:
+                    crate['x'] = target_crate['x']
+                    crate['y'] = target_crate['y']
+                    crate['z'] = target_crate['z'] + target_crate['h']
+                else:
+                    crate['x'] = 0
+                    crate['y'] = 0
+                    crate['z'] = 0
+            else:
+                # Place next to previous crates in X direction
+                total_length = sum(c['l'] for c in placed_crates if c['z'] == 0)
+                crate['x'] = total_length
                 crate['y'] = 0
                 crate['z'] = 0
 
-            # Save occupied area
-            occupied.append((
-                crate['x'], crate['y'], crate['z'],
-                crate['l'], crate['w'], crate['h']
-            ))
+            placed_crates.append(crate)
 
-        # Plot
+        # Build 3D plot
         fig = go.Figure()
 
         # Truck boundary
@@ -82,40 +98,39 @@ def index():
             color='lightgray'
         ))
 
+        # Colors
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
 
-        for idx, crate in enumerate(crates):
-            x = crate['x']
-            y = crate['y']
-            z = crate['z']
+        # Plot crates
+        for idx, crate in enumerate(placed_crates):
+            color = colors[idx % len(colors)]
+            x0 = crate['x']
+            y0 = crate['y']
+            z0 = crate['z']
             l = crate['l']
             w = crate['w']
             h = crate['h']
-            label = crate['label']
-            color = colors[idx % len(colors)]
 
-            # Draw crate
             fig.add_trace(go.Mesh3d(
-                x=[x, x + l, x + l, x, x, x + l, x + l, x],
-                y=[y, y, y + w, y + w, y, y, y + w, y + w],
-                z=[z, z, z, z, z + h, z + h, z + h, z + h],
+                x=[x0, x0 + l, x0 + l, x0, x0, x0 + l, x0 + l, x0],
+                y=[y0, y0, y0 + w, y0 + w, y0, y0, y0 + w, y0 + w],
+                z=[z0, z0, z0, z0, z0 + h, z0 + h, z0 + h, z0 + h],
                 i=[0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4],
                 j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
                 k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
                 opacity=0.7,
                 color=color,
-                name=label
+                name=crate['label']
             ))
 
-            # Add label as text point
+            # Add label as text annotation
             fig.add_trace(go.Scatter3d(
-                x=[x + l/2],
-                y=[y + w/2],
-                z=[z + h + 0.1],
+                x=[x0 + l/2],
+                y=[y0 + w/2],
+                z=[z0 + h/2],
                 mode='text',
-                text=[label],
-                textposition='top center',
-                textfont=dict(size=12, color='black')
+                text=[crate['label']],
+                textposition='middle center'
             ))
 
         fig.update_layout(
@@ -133,7 +148,43 @@ def index():
 
         plot_div = pyo.plot(fig, output_type='div', include_plotlyjs='cdn')
 
-    return render_template('index.html', plot_div=plot_div)
+        # Build 2D top-down floorplan (X-Y only)
+        topdown_fig = go.Figure()
+        for idx, crate in enumerate(placed_crates):
+            color = colors[idx % len(colors)]
+            x = crate['x']
+            y = crate['y']
+            l = crate['l']
+            w = crate['w']
+            label = crate['label']
+
+            topdown_fig.add_shape(
+                type='rect',
+                x0=x,
+                x1=x + l,
+                y0=y,
+                y1=y + w,
+                line=dict(color='black'),
+                fillcolor=color
+            )
+
+            topdown_fig.add_trace(go.Scatter(
+                x=[x + l / 2],
+                y=[y + w / 2],
+                text=[label],
+                mode='text'
+            ))
+
+        topdown_fig.update_layout(
+            xaxis=dict(range=[0, truck_length], title='Length (m)', scaleanchor='y', scaleratio=1),
+            yaxis=dict(range=[0, truck_width], title='Width (m)'),
+            title='Top-down Floorplan (Truck view)',
+            margin=dict(l=0, r=0, b=0, t=50)
+        )
+
+        topdown_plot_div = pyo.plot(topdown_fig, output_type='div', include_plotlyjs='cdn')
+
+    return render_template('index.html', plot_div=plot_div, topdown_plot_div=topdown_plot_div)
 
 if __name__ == '__main__':
     app.run(debug=True)
