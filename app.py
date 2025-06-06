@@ -1,13 +1,14 @@
 from flask import Flask, render_template, request
 import plotly.graph_objs as go
 import plotly.offline as pyo
+from py3dbp import Packer, Bin, Item
 
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     plot_div = ""
-    topdown_plot_div = ""
+    top_view_div = ""
 
     if request.method == 'POST':
         # Read truck dimensions
@@ -25,65 +26,59 @@ def index():
         truck_width = convert(truck_width, request.form['truck_width_unit'])
         truck_height = convert(truck_height, request.form['truck_height_unit'])
 
+        # Build Packer
+        packer = Packer()
+        bin = Bin("Truck", truck_length, truck_width, truck_height, 99999)  # very high weight limit
+        packer.add_bin(bin)
+
         # Read crates
-        crates = []
         crate_idx = 1
+        crate_data = []
+
         while True:
+            label_field = f'crate{crate_idx}_label'
             length_field = f'crate{crate_idx}_length'
             width_field = f'crate{crate_idx}_width'
             height_field = f'crate{crate_idx}_height'
-            label_field = f'crate{crate_idx}_label'
             stackable_field = f'crate{crate_idx}_stackable'
             stack_target_field = f'crate{crate_idx}_stack_target'
 
             if length_field in request.form:
+                label = request.form.get(label_field, f"Crate {crate_idx}")
                 l = convert(request.form[length_field], request.form[f'crate{crate_idx}_length_unit'])
                 w = convert(request.form[width_field], request.form[f'crate{crate_idx}_width_unit'])
                 h = convert(request.form[height_field], request.form[f'crate{crate_idx}_height_unit'])
-                label = request.form[label_field] or f'Crate {crate_idx}'
-                stackable = request.form[stackable_field]
-                stack_target = request.form[stack_target_field].strip()
+                stackable = request.form.get(stackable_field, 'No')
+                stack_target = request.form.get(stack_target_field, '').strip()
 
-                crate = {
+                crate_data.append({
                     'label': label,
                     'l': l,
                     'w': w,
                     'h': h,
                     'stackable': stackable,
-                    'stack_target': stack_target,
-                    'x': None,
-                    'y': None,
-                    'z': None
-                }
-                crates.append(crate)
+                    'stack_target': stack_target
+                })
+
                 crate_idx += 1
             else:
                 break
 
-        # Place crates
-        placed_crates = []
-        for crate in crates:
-            if crate['stackable'] == 'Yes' and crate['stack_target']:
-                target_label = crate['stack_target']
-                target_crate = next((c for c in placed_crates if c['label'] == target_label), None)
-                if target_crate:
-                    crate['x'] = target_crate['x']
-                    crate['y'] = target_crate['y']
-                    crate['z'] = target_crate['z'] + target_crate['h']
-                else:
-                    crate['x'] = 0
-                    crate['y'] = 0
-                    crate['z'] = 0
-            else:
-                # Place next to previous crates in X direction
-                total_length = sum(c['l'] for c in placed_crates if c['z'] == 0)
-                crate['x'] = total_length
-                crate['y'] = 0
-                crate['z'] = 0
+        # ADD items to packer
+        for crate in crate_data:
+            item = Item(
+                crate['label'],
+                crate['l'],
+                crate['w'],
+                crate['h'],
+                1  # weight can be 1 for now
+            )
+            packer.add_item(item)
 
-            placed_crates.append(crate)
+        # Pack!
+        packer.pack()
 
-        # Build 3D plot
+        # Visualize
         fig = go.Figure()
 
         # Truck boundary
@@ -98,41 +93,43 @@ def index():
             color='lightgray'
         ))
 
-        # Colors
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink']
 
-        # Plot crates
-        for idx, crate in enumerate(placed_crates):
+        for idx, item in enumerate(bin.items):
+            x = item.position[0]
+            y = item.position[1]
+            z = item.position[2]
+            l = item.get_dimension()[0]
+            w = item.get_dimension()[1]
+            h = item.get_dimension()[2]
+            label = item.name
+
             color = colors[idx % len(colors)]
-            x0 = crate['x']
-            y0 = crate['y']
-            z0 = crate['z']
-            l = crate['l']
-            w = crate['w']
-            h = crate['h']
 
             fig.add_trace(go.Mesh3d(
-                x=[x0, x0 + l, x0 + l, x0, x0, x0 + l, x0 + l, x0],
-                y=[y0, y0, y0 + w, y0 + w, y0, y0, y0 + w, y0 + w],
-                z=[z0, z0, z0, z0, z0 + h, z0 + h, z0 + h, z0 + h],
+                x=[x, x + l, x + l, x, x, x + l, x + l, x],
+                y=[y, y, y + w, y + w, y, y, y + w, y + w],
+                z=[z, z, z, z, z + h, z + h, z + h, z + h],
                 i=[0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 5, 4],
                 j=[1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7],
                 k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
                 opacity=0.7,
                 color=color,
-                name=crate['label']
+                name=label
             ))
 
-            # Add label as text annotation
+            # Add label as text
             fig.add_trace(go.Scatter3d(
-                x=[x0 + l/2],
-                y=[y0 + w/2],
-                z=[z0 + h/2],
+                x=[x + l / 2],
+                y=[y + w / 2],
+                z=[z + h / 2],
                 mode='text',
-                text=[crate['label']],
-                textposition='middle center'
+                text=[label],
+                textposition='middle center',
+                showlegend=False
             ))
 
+        # Set scene
         fig.update_layout(
             scene=dict(
                 xaxis_title='Length (m)',
@@ -140,51 +137,15 @@ def index():
                 zaxis_title='Height (m)',
                 xaxis=dict(range=[0, truck_length]),
                 yaxis=dict(range=[0, truck_width]),
-                zaxis=dict(range=[0, truck_height])
+                zaxis=dict(range=[0, truck_height]),
             ),
-            title='3D Crate Planner',
+            title='3D Crate Planner (True 3D)',
             margin=dict(l=0, r=0, b=0, t=50)
         )
 
         plot_div = pyo.plot(fig, output_type='div', include_plotlyjs='cdn')
 
-        # Build 2D top-down floorplan (X-Y only)
-        topdown_fig = go.Figure()
-        for idx, crate in enumerate(placed_crates):
-            color = colors[idx % len(colors)]
-            x = crate['x']
-            y = crate['y']
-            l = crate['l']
-            w = crate['w']
-            label = crate['label']
-
-            topdown_fig.add_shape(
-                type='rect',
-                x0=x,
-                x1=x + l,
-                y0=y,
-                y1=y + w,
-                line=dict(color='black'),
-                fillcolor=color
-            )
-
-            topdown_fig.add_trace(go.Scatter(
-                x=[x + l / 2],
-                y=[y + w / 2],
-                text=[label],
-                mode='text'
-            ))
-
-        topdown_fig.update_layout(
-            xaxis=dict(range=[0, truck_length], title='Length (m)', scaleanchor='y', scaleratio=1),
-            yaxis=dict(range=[0, truck_width], title='Width (m)'),
-            title='Top-down Floorplan (Truck view)',
-            margin=dict(l=0, r=0, b=0, t=50)
-        )
-
-        topdown_plot_div = pyo.plot(topdown_fig, output_type='div', include_plotlyjs='cdn')
-
-    return render_template('index.html', plot_div=plot_div, topdown_plot_div=topdown_plot_div)
+    return render_template('index.html', plot_div=plot_div)
 
 if __name__ == '__main__':
     app.run(debug=True)
