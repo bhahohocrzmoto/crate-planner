@@ -3,56 +3,72 @@
 <head>
     <title>Crate Planner</title>
     <script>
-        let crateCounter = 1;
+        function updateStackableDropdown(crateNumber) {
+            const stackableSelect = document.getElementById(`crate${crateNumber}_stackable`);
+            const targetDiv = document.getElementById(`crate${crateNumber}_stack_target_div`);
+            const targetSelect = document.getElementById(`crate${crateNumber}_stack_target`);
+
+            if (stackableSelect.value === "yes") {
+                targetDiv.style.display = "block";
+
+                // Clear current options
+                targetSelect.innerHTML = "";
+
+                // Add options for crates 1..N excluding current crate
+                const totalCrates = parseInt(document.getElementById("total_crates").value);
+                for (let i = 1; i <= totalCrates; i++) {
+                    if (i === crateNumber) continue; // skip self
+                    const label = document.getElementById(`crate${i}_label`).value || `Crate ${i}`;
+                    const option = document.createElement("option");
+                    option.value = i;
+                    option.text = label;
+                    targetSelect.appendChild(option);
+                }
+
+            } else {
+                targetDiv.style.display = "none";
+            }
+        }
 
         function addCrate() {
-            crateCounter += 1;
+            const totalCratesInput = document.getElementById("total_crates");
+            let count = parseInt(totalCratesInput.value);
+            count += 1;
+            totalCratesInput.value = count;
 
-            const crateDiv = document.createElement('div');
-            crateDiv.innerHTML = `
-                <h3>Crate ${crateCounter}</h3>
-                Length: <input type="number" name="crate${crateCounter}_length" step="any">
-                <select name="crate${crateCounter}_length_unit">
+            const cratesDiv = document.getElementById("crates");
+            const newDiv = document.createElement("div");
+
+            newDiv.innerHTML = `
+                <h3>Crate ${count}</h3>
+                Label: <input type="text" name="crate${count}_label" id="crate${count}_label" required><br>
+                Length: <input type="number" name="crate${count}_length" required> 
+                <select name="crate${count}_length_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-
-                Width: <input type="number" name="crate${crateCounter}_width" step="any">
-                <select name="crate${crateCounter}_width_unit">
+                Width: <input type="number" name="crate${count}_width" required> 
+                <select name="crate${count}_width_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-
-                Height: <input type="number" name="crate${crateCounter}_height" step="any">
-                <select name="crate${crateCounter}_height_unit">
+                Height: <input type="number" name="crate${count}_height" required> 
+                <select name="crate${count}_height_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-
-                Stackable:
-                <select name="crate${crateCounter}_stackable" onchange="toggleStackTarget(${crateCounter})">
+                Stackable: 
+                <select name="crate${count}_stackable" id="crate${count}_stackable" onchange="updateStackableDropdown(${count})">
                     <option value="no" selected>No</option>
                     <option value="yes">Yes</option>
                 </select><br>
-
-                <div id="stack_target_${crateCounter}" style="display: none;">
-                    Which crate should be stacked on top of this crate?
-                    <input type="number" name="crate${crateCounter}_stack_target" min="1" step="1"><br>
+                <div id="crate${count}_stack_target_div" style="display:none;">
+                    Which crate should be stacked on top of this crate? 
+                    <select name="crate${count}_stack_target" id="crate${count}_stack_target"></select>
                 </div>
+                <hr>
             `;
-
-            document.getElementById('crates_container').appendChild(crateDiv);
-        }
-
-        function toggleStackTarget(crateNum) {
-            const stackSelect = document.querySelector(`select[name="crate${crateNum}_stackable"]`);
-            const targetDiv = document.getElementById(`stack_target_${crateNum}`);
-
-            if (stackSelect.value === 'yes') {
-                targetDiv.style.display = 'block';
-            } else {
-                targetDiv.style.display = 'none';
-            }
+            cratesDiv.appendChild(newDiv);
         }
     </script>
 </head>
@@ -60,59 +76,56 @@
     <h1>Crate Planner</h1>
 
     <form method="POST">
-        <h3>Truck size</h3>
-        Length: <input type="number" name="truck_length" step="any">
+        <h2>Truck size</h2>
+        Length: <input type="number" name="truck_length" required> 
         <select name="truck_length_unit">
             <option value="m">m</option>
             <option value="cm">cm</option>
         </select><br>
-
-        Width: <input type="number" name="truck_width" step="any">
+        Width: <input type="number" name="truck_width" required> 
         <select name="truck_width_unit">
             <option value="m">m</option>
             <option value="cm">cm</option>
         </select><br>
-
-        Height: <input type="number" name="truck_height" step="any">
+        Height: <input type="number" name="truck_height" required> 
         <select name="truck_height_unit">
             <option value="m">m</option>
             <option value="cm">cm</option>
         </select><br>
 
-        <div id="crates_container">
+        <input type="hidden" id="total_crates" name="total_crates" value="1">
+
+        <div id="crates">
             <h3>Crate 1</h3>
-            Length: <input type="number" name="crate1_length" step="any">
+            Label: <input type="text" name="crate1_label" id="crate1_label" required><br>
+            Length: <input type="number" name="crate1_length" required> 
             <select name="crate1_length_unit">
                 <option value="m">m</option>
                 <option value="cm">cm</option>
             </select><br>
-
-            Width: <input type="number" name="crate1_width" step="any">
+            Width: <input type="number" name="crate1_width" required> 
             <select name="crate1_width_unit">
                 <option value="m">m</option>
                 <option value="cm">cm</option>
             </select><br>
-
-            Height: <input type="number" name="crate1_height" step="any">
+            Height: <input type="number" name="crate1_height" required> 
             <select name="crate1_height_unit">
                 <option value="m">m</option>
                 <option value="cm">cm</option>
             </select><br>
-
-            Stackable:
-            <select name="crate1_stackable" onchange="toggleStackTarget(1)">
+            Stackable: 
+            <select name="crate1_stackable" id="crate1_stackable" onchange="updateStackableDropdown(1)">
                 <option value="no" selected>No</option>
                 <option value="yes">Yes</option>
             </select><br>
-
-            <div id="stack_target_1" style="display: none;">
-                Which crate should be stacked on top of this crate?
-                <input type="number" name="crate1_stack_target" min="1" step="1"><br>
+            <div id="crate1_stack_target_div" style="display:none;">
+                Which crate should be stacked on top of this crate? 
+                <select name="crate1_stack_target" id="crate1_stack_target"></select>
             </div>
+            <hr>
         </div>
 
         <button type="button" onclick="addCrate()">+ Add Crate</button><br><br>
-
         <button type="submit">Run Planner</button>
     </form>
 
