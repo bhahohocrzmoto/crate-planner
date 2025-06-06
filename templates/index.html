@@ -3,72 +3,51 @@
 <head>
     <title>Crate Planner</title>
     <script>
-        function updateStackableDropdown(crateNumber) {
-            const stackableSelect = document.getElementById(`crate${crateNumber}_stackable`);
-            const targetDiv = document.getElementById(`crate${crateNumber}_stack_target_div`);
-            const targetSelect = document.getElementById(`crate${crateNumber}_stack_target`);
-
-            if (stackableSelect.value === "yes") {
-                targetDiv.style.display = "block";
-
-                // Clear current options
-                targetSelect.innerHTML = "";
-
-                // Add options for crates 1..N excluding current crate
-                const totalCrates = parseInt(document.getElementById("total_crates").value);
-                for (let i = 1; i <= totalCrates; i++) {
-                    if (i === crateNumber) continue; // skip self
-                    const label = document.getElementById(`crate${i}_label`).value || `Crate ${i}`;
-                    const option = document.createElement("option");
-                    option.value = i;
-                    option.text = label;
-                    targetSelect.appendChild(option);
-                }
-
+        function updateStackTargetOptions(crateIdx) {
+            const stackableSelect = document.getElementById(`crate${crateIdx}_stackable`);
+            const stackTargetDiv = document.getElementById(`crate${crateIdx}_stack_target_div`);
+            if (stackableSelect.value === 'Yes') {
+                stackTargetDiv.style.display = 'block';
             } else {
-                targetDiv.style.display = "none";
+                stackTargetDiv.style.display = 'none';
+                document.getElementById(`crate${crateIdx}_stack_target`).value = '';
             }
         }
 
         function addCrate() {
-            const totalCratesInput = document.getElementById("total_crates");
-            let count = parseInt(totalCratesInput.value);
-            count += 1;
-            totalCratesInput.value = count;
-
-            const cratesDiv = document.getElementById("crates");
-            const newDiv = document.createElement("div");
-
-            newDiv.innerHTML = `
-                <h3>Crate ${count}</h3>
-                Label: <input type="text" name="crate${count}_label" id="crate${count}_label" required><br>
-                Length: <input type="number" name="crate${count}_length" required> 
-                <select name="crate${count}_length_unit">
+            const crateCount = document.getElementsByClassName('crate').length + 1;
+            const crateDiv = document.createElement('div');
+            crateDiv.className = 'crate';
+            crateDiv.innerHTML = `
+                <h2>Crate ${crateCount}</h2>
+                Label: <input type="text" name="crate${crateCount}_label"><br>
+                Length: <input type="number" name="crate${crateCount}_length" step="0.01"> 
+                <select name="crate${crateCount}_length_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Width: <input type="number" name="crate${count}_width" required> 
-                <select name="crate${count}_width_unit">
+                Width: <input type="number" name="crate${crateCount}_width" step="0.01"> 
+                <select name="crate${crateCount}_width_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Height: <input type="number" name="crate${count}_height" required> 
-                <select name="crate${count}_height_unit">
+                Height: <input type="number" name="crate${crateCount}_height" step="0.01"> 
+                <select name="crate${crateCount}_height_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
                 Stackable: 
-                <select name="crate${count}_stackable" id="crate${count}_stackable" onchange="updateStackableDropdown(${count})">
-                    <option value="no" selected>No</option>
-                    <option value="yes">Yes</option>
+                <select name="crate${crateCount}_stackable" id="crate${crateCount}_stackable" onchange="updateStackTargetOptions(${crateCount})">
+                    <option value="No" selected>No</option>
+                    <option value="Yes">Yes</option>
                 </select><br>
-                <div id="crate${count}_stack_target_div" style="display:none;">
-                    Which crate should be stacked on top of this crate? 
-                    <select name="crate${count}_stack_target" id="crate${count}_stack_target"></select>
+                <div id="crate${crateCount}_stack_target_div" style="display:none;">
+                    Which crate should be stacked on top of this crate?
+                    <input type="text" name="crate${crateCount}_stack_target" id="crate${crateCount}_stack_target">
                 </div>
                 <hr>
             `;
-            cratesDiv.appendChild(newDiv);
+            document.getElementById('crates').appendChild(crateDiv);
         }
     </script>
 </head>
@@ -77,60 +56,63 @@
 
     <form method="POST">
         <h2>Truck size</h2>
-        Length: <input type="number" name="truck_length" required> 
+        Length: <input type="number" name="truck_length" value="10" step="0.01"> 
         <select name="truck_length_unit">
             <option value="m">m</option>
             <option value="cm">cm</option>
         </select><br>
-        Width: <input type="number" name="truck_width" required> 
+        Width: <input type="number" name="truck_width" value="10" step="0.01"> 
         <select name="truck_width_unit">
             <option value="m">m</option>
             <option value="cm">cm</option>
         </select><br>
-        Height: <input type="number" name="truck_height" required> 
+        Height: <input type="number" name="truck_height" value="10" step="0.01"> 
         <select name="truck_height_unit">
             <option value="m">m</option>
             <option value="cm">cm</option>
         </select><br>
 
-        <input type="hidden" id="total_crates" name="total_crates" value="1">
-
         <div id="crates">
-            <h3>Crate 1</h3>
-            Label: <input type="text" name="crate1_label" id="crate1_label" required><br>
-            Length: <input type="number" name="crate1_length" required> 
-            <select name="crate1_length_unit">
-                <option value="m">m</option>
-                <option value="cm">cm</option>
-            </select><br>
-            Width: <input type="number" name="crate1_width" required> 
-            <select name="crate1_width_unit">
-                <option value="m">m</option>
-                <option value="cm">cm</option>
-            </select><br>
-            Height: <input type="number" name="crate1_height" required> 
-            <select name="crate1_height_unit">
-                <option value="m">m</option>
-                <option value="cm">cm</option>
-            </select><br>
-            Stackable: 
-            <select name="crate1_stackable" id="crate1_stackable" onchange="updateStackableDropdown(1)">
-                <option value="no" selected>No</option>
-                <option value="yes">Yes</option>
-            </select><br>
-            <div id="crate1_stack_target_div" style="display:none;">
-                Which crate should be stacked on top of this crate? 
-                <select name="crate1_stack_target" id="crate1_stack_target"></select>
+            <div class="crate">
+                <h2>Crate 1</h2>
+                Label: <input type="text" name="crate1_label"><br>
+                Length: <input type="number" name="crate1_length" step="0.01"> 
+                <select name="crate1_length_unit">
+                    <option value="m">m</option>
+                    <option value="cm">cm</option>
+                </select><br>
+                Width: <input type="number" name="crate1_width" step="0.01"> 
+                <select name="crate1_width_unit">
+                    <option value="m">m</option>
+                    <option value="cm">cm</option>
+                </select><br>
+                Height: <input type="number" name="crate1_height" step="0.01"> 
+                <select name="crate1_height_unit">
+                    <option value="m">m</option>
+                    <option value="cm">cm</option>
+                </select><br>
+                Stackable: 
+                <select name="crate1_stackable" id="crate1_stackable" onchange="updateStackTargetOptions(1)">
+                    <option value="No" selected>No</option>
+                    <option value="Yes">Yes</option>
+                </select><br>
+                <div id="crate1_stack_target_div" style="display:none;">
+                    Which crate should be stacked on top of this crate?
+                    <input type="text" name="crate1_stack_target" id="crate1_stack_target">
+                </div>
+                <hr>
             </div>
-            <hr>
         </div>
 
         <button type="button" onclick="addCrate()">+ Add Crate</button><br><br>
         <button type="submit">Run Planner</button>
     </form>
 
-    <div>
-        {{ plot_div | safe }}
-    </div>
+    <h2>3D Crate Planner</h2>
+    {{ plot_div|safe }}
+
+    <h2>Top-down 2D Floorplan</h2>
+    {{ topdown_plot_div|safe }}
+
 </body>
 </html>
