@@ -3,51 +3,57 @@
 <head>
     <title>Crate Planner</title>
     <script>
-        function updateStackTargetOptions(crateIdx) {
-            const stackableSelect = document.getElementById(`crate${crateIdx}_stackable`);
-            const stackTargetDiv = document.getElementById(`crate${crateIdx}_stack_target_div`);
-            if (stackableSelect.value === 'Yes') {
-                stackTargetDiv.style.display = 'block';
+        // Show/hide stack target field
+        function updateStackable(crateIdx) {
+            var stackableSelect = document.getElementById("crate" + crateIdx + "_stackable");
+            var targetDiv = document.getElementById("crate" + crateIdx + "_stack_target_div");
+
+            if (stackableSelect.value === "Yes") {
+                targetDiv.style.display = "block";
             } else {
-                stackTargetDiv.style.display = 'none';
-                document.getElementById(`crate${crateIdx}_stack_target`).value = '';
+                targetDiv.style.display = "none";
             }
         }
 
+        // Add new crate fields
+        var crateCount = 1;
+
         function addCrate() {
-            const crateCount = document.getElementsByClassName('crate').length + 1;
-            const crateDiv = document.createElement('div');
-            crateDiv.className = 'crate';
-            crateDiv.innerHTML = `
-                <h2>Crate ${crateCount}</h2>
-                Label: <input type="text" name="crate${crateCount}_label"><br>
-                Length: <input type="number" name="crate${crateCount}_length" step="0.01"> 
+            crateCount++;
+            var container = document.getElementById("crates_container");
+
+            var crateHTML = `
+            <fieldset>
+                <legend>Crate ${crateCount}</legend>
+                Label: <input type="text" name="crate${crateCount}_label" value="Crate ${crateCount}"><br>
+                Length: <input type="number" name="crate${crateCount}_length" value="1" step="0.1">
                 <select name="crate${crateCount}_length_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Width: <input type="number" name="crate${crateCount}_width" step="0.01"> 
+                Width: <input type="number" name="crate${crateCount}_width" value="1" step="0.1">
                 <select name="crate${crateCount}_width_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Height: <input type="number" name="crate${crateCount}_height" step="0.01"> 
+                Height: <input type="number" name="crate${crateCount}_height" value="1" step="0.1">
                 <select name="crate${crateCount}_height_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Stackable: 
-                <select name="crate${crateCount}_stackable" id="crate${crateCount}_stackable" onchange="updateStackTargetOptions(${crateCount})">
+                Stackable:
+                <select name="crate${crateCount}_stackable" id="crate${crateCount}_stackable" onchange="updateStackable(${crateCount})">
                     <option value="No" selected>No</option>
                     <option value="Yes">Yes</option>
                 </select><br>
                 <div id="crate${crateCount}_stack_target_div" style="display:none;">
-                    Which crate should be stacked on top of this crate?
-                    <input type="text" name="crate${crateCount}_stack_target" id="crate${crateCount}_stack_target">
+                    Which crate should be stacked on top of this crate? 
+                    <input type="text" name="crate${crateCount}_stack_target"><br>
                 </div>
-                <hr>
+            </fieldset>
             `;
-            document.getElementById('crates').appendChild(crateDiv);
+
+            container.insertAdjacentHTML('beforeend', crateHTML);
         }
     </script>
 </head>
@@ -55,64 +61,62 @@
     <h1>Crate Planner</h1>
 
     <form method="POST">
-        <h2>Truck size</h2>
-        Length: <input type="number" name="truck_length" value="10" step="0.01"> 
-        <select name="truck_length_unit">
-            <option value="m">m</option>
-            <option value="cm">cm</option>
-        </select><br>
-        Width: <input type="number" name="truck_width" value="10" step="0.01"> 
-        <select name="truck_width_unit">
-            <option value="m">m</option>
-            <option value="cm">cm</option>
-        </select><br>
-        Height: <input type="number" name="truck_height" value="10" step="0.01"> 
-        <select name="truck_height_unit">
-            <option value="m">m</option>
-            <option value="cm">cm</option>
-        </select><br>
+        <fieldset>
+            <legend>Truck size</legend>
+            Length: <input type="number" name="truck_length" value="10" step="0.1">
+            <select name="truck_length_unit">
+                <option value="m">m</option>
+                <option value="cm">cm</option>
+            </select><br>
+            Width: <input type="number" name="truck_width" value="10" step="0.1">
+            <select name="truck_width_unit">
+                <option value="m">m</option>
+                <option value="cm">cm</option>
+            </select><br>
+            Height: <input type="number" name="truck_height" value="10" step="0.1">
+            <select name="truck_height_unit">
+                <option value="m">m</option>
+                <option value="cm">cm</option>
+            </select><br>
+        </fieldset>
 
-        <div id="crates">
-            <div class="crate">
-                <h2>Crate 1</h2>
-                Label: <input type="text" name="crate1_label"><br>
-                Length: <input type="number" name="crate1_length" step="0.01"> 
+        <div id="crates_container">
+            <fieldset>
+                <legend>Crate 1</legend>
+                Label: <input type="text" name="crate1_label" value="Crate 1"><br>
+                Length: <input type="number" name="crate1_length" value="1" step="0.1">
                 <select name="crate1_length_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Width: <input type="number" name="crate1_width" step="0.01"> 
+                Width: <input type="number" name="crate1_width" value="1" step="0.1">
                 <select name="crate1_width_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Height: <input type="number" name="crate1_height" step="0.01"> 
+                Height: <input type="number" name="crate1_height" value="1" step="0.1">
                 <select name="crate1_height_unit">
                     <option value="m">m</option>
                     <option value="cm">cm</option>
                 </select><br>
-                Stackable: 
-                <select name="crate1_stackable" id="crate1_stackable" onchange="updateStackTargetOptions(1)">
+                Stackable:
+                <select name="crate1_stackable" id="crate1_stackable" onchange="updateStackable(1)">
                     <option value="No" selected>No</option>
                     <option value="Yes">Yes</option>
                 </select><br>
                 <div id="crate1_stack_target_div" style="display:none;">
-                    Which crate should be stacked on top of this crate?
-                    <input type="text" name="crate1_stack_target" id="crate1_stack_target">
+                    Which crate should be stacked on top of this crate? 
+                    <input type="text" name="crate1_stack_target"><br>
                 </div>
-                <hr>
-            </div>
+            </fieldset>
         </div>
 
         <button type="button" onclick="addCrate()">+ Add Crate</button><br><br>
         <button type="submit">Run Planner</button>
     </form>
 
-    <h2>3D Crate Planner</h2>
-    {{ plot_div|safe }}
-
-    <h2>Top-down 2D Floorplan</h2>
-    {{ topdown_plot_div|safe }}
-
+    <div>
+        {{ plot_div | safe }}
+    </div>
 </body>
 </html>
