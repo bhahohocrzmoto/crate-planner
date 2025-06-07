@@ -16,7 +16,7 @@ def index():
 
         # Initialize Packer
         packer = Packer()
-        truck = Bin("Truck", truck_length, truck_width, truck_height, 100000)
+        truck = Bin("Truck", truck_width, truck_height, truck_length, 100000)  # NOTE: py3dbp → width, height, depth
         packer.add_bin(truck)
 
         # Read crates
@@ -37,7 +37,7 @@ def index():
             stack_target = request.form.get(f"crate{crate_index}_stack_target", "")
 
             # Create item
-            item = Item(label, length, width, height, 1)  # weight=1
+            item = Item(label, width, height, length, 1)  # weight=1 → py3dbp uses width, height, depth
             crates.append(item)
 
             # Remember stacking relation
@@ -59,26 +59,29 @@ def index():
                 base = label_to_item[base_label]
                 top = label_to_item[top_label]
 
-                # If base is not positioned yet → place it first at origin
+                # If base is not positioned yet → place at origin
                 if base.name not in positioned:
                     base.position = (0, 0, 0)
                     positioned.add(base.name)
 
-                # Place top crate exactly on top of base
+                # Place top crate on top of base
                 base_x, base_y, base_z = base.position
                 top.position = (base_x, base_y, base_z + base.height)
                 positioned.add(top.name)
 
-        # Run packer (will respect pre-positioned crates)
+                # DEBUG print
+                print(f"DEBUG: Placing '{top.name}' on top of '{base.name}' at position {top.position}")
+
+        # Run packer (will respect manual positions)
         packer.pack(bigger_first=False)
 
         # Build Plotly Mesh3D plot
         fig = go.Figure()
 
-        # Draw truck
+        # Draw truck (fixed → depth)
         truck_shape = dict(
             x=[0, truck.width, truck.width, 0, 0, truck.width, truck.width, 0],
-            y=[0, 0, truck.length, truck.length, 0, 0, truck.length, truck.length],
+            y=[0, 0, truck.depth, truck.depth, 0, 0, truck.depth, truck.depth],  # FIXED → truck.depth
             z=[0, 0, 0, 0, truck.height, truck.height, truck.height, truck.height],
             opacity=0.1,
             color="gray",
@@ -98,7 +101,7 @@ def index():
         for i, item in enumerate(packer.bins[0].items):
             x0, y0, z0 = item.position
             x1 = x0 + item.width
-            y1 = y0 + item.length
+            y1 = y0 + item.depth  # NOTE: py3dbp → item.depth
             z1 = z0 + item.height
 
             fig.add_trace(go.Mesh3d(
@@ -114,7 +117,7 @@ def index():
         fig.update_layout(
             scene=dict(
                 xaxis_title="Width (m)",
-                yaxis_title="Length (m)",
+                yaxis_title="Length (m)",  # Length = depth
                 zaxis_title="Height (m)"
             ),
             margin=dict(l=0, r=0, t=0, b=0)
