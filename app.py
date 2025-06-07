@@ -39,7 +39,7 @@ def index():
                 w = convert(request.form[width_field], request.form[f'crate{crate_idx}_width_unit'])
                 h = convert(request.form[height_field], request.form[f'crate{crate_idx}_height_unit'])
                 stackable = request.form[stackable_field]
-                stack_target = request.form.get(stack_target_field, '')
+                stack_target = request.form.get(stack_target_field, '').strip()
 
                 crates.append({
                     'label': label,
@@ -48,33 +48,60 @@ def index():
                     'h': h,
                     'stackable': stackable,
                     'stack_target': stack_target,
+                    'position': None  # to be set later
                 })
 
                 crate_idx += 1
             else:
                 break
 
-        # Pack with py3dbp
+        # First → place non-stacked crates (stackable = no or no target)
         packer = Packer()
         bin1 = Bin("Truck", truck_length, truck_width, truck_height, 10000)
         packer.add_bin(bin1)
 
+        label_to_crate = {}  # mapping for stack targets
+
+        # STEP 1 → Place base crates
         for crate in crates:
-            item = Item(
-                crate['label'],
-                crate['l'],
-                crate['w'],
-                crate['h'],
-                1  # weight
-            )
-            packer.add_item(item)
+            if crate['stackable'] == 'no' or crate['stack_target'] == '':
+                item = Item(
+                    crate['label'],
+                    crate['l'],
+                    crate['w'],
+                    crate['h'],
+                    1
+                )
+                packer.add_item(item)
+                label_to_crate[crate['label']] = crate  # save reference
 
         packer.pack()
 
-        # Create 3D Plotly plot
+        # After packing → store positions for non-stacked
+        for item in bin1.items:
+            label = item.name
+            crate = label_to_crate[label]
+            crate['position'] = (
+                item.position[0],
+                item.position[1],
+                item.position[2]
+            )
+
+        # STEP 2 → Place stacked crates
+        stacked_items = []
+        for crate in crates:
+            if crate['stackable'] == 'yes' and crate['stack_target'] != '':
+                target_label = crate['stack_target']
+                target_crate = next((c for c in crates if c['label'] == target_label), None)
+                if target_crate and target_crate['position'] is not None:
+                    x0, y0, z0 = target_crate['position']
+                    crate['position'] = (x0, y0, z0 + target_crate['h'])
+                    stacked_items.append(crate)
+
+        # Build 3D Plot
         fig = go.Figure()
 
-        # Draw truck box (transparent)
+        # Draw truck box
         fig.add_trace(go.Mesh3d(
             x=[0, truck_length, truck_length, 0, 0, truck_length, truck_length, 0],
             y=[0, 0, truck_width, truck_width, 0, 0, truck_width, truck_width],
@@ -89,15 +116,35 @@ def index():
 
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow']
 
-        for idx, item in enumerate(bin1.items):
-            x0 = item.position[0]
-            y0 = item.position[1]
-            z0 = item.position[2]
+        # Draw all crates (both auto-packed and stacked)
+        all_crates_to_draw = []
 
-            l = item.width
-            w = item.height
-            h = item.depth
+        # Auto-packed
+        for item in bin1.items:
+            all_crates_to_draw.append({
+                'label': item.name,
+                'l': item.width,
+                'w': item.height,
+                'h': item.depth,
+                'position': item.position
+            })
 
+        # Stacked crates
+        for crate in stacked_items:
+            all_crates_to_draw.append({
+                'label': crate['label'],
+                'l': crate['l'],
+                'w': crate['w'],
+                'h': crate['h'],
+                'position': crate['position']
+            })
+
+        # Draw
+        for idx, crate in enumerate(all_crates_to_draw):
+            x0, y0, z0 = crate['position']
+            l = crate['l']
+            w = crate['w']
+            h = crate['h']
             color = colors[idx % len(colors)]
 
             fig.add_trace(go.Mesh3d(
@@ -109,16 +156,16 @@ def index():
                 k=[5, 6, 7, 4, 0, 1, 2, 3, 1, 2, 3, 0],
                 opacity=0.7,
                 color=color,
-                name=item.name
+                name=crate['label']
             ))
 
-            # Add label text at center of crate
+            # Label text
             fig.add_trace(go.Scatter3d(
                 x=[x0 + l/2],
                 y=[y0 + w/2],
                 z=[z0 + h/2],
                 mode='text',
-                text=[item.name],
+                text=[crate['label']],
                 textposition='middle center',
                 textfont=dict(size=12, color='black'),
                 showlegend=False
@@ -134,7 +181,7 @@ def index():
                 yaxis=dict(range=[0, truck_width]),
                 zaxis=dict(range=[0, truck_height]),
             ),
-            title='3D Crate Planner (True 3D)',
+            title='3D Crate Planner with Stacking!',
             margin=dict(l=0, r=0, b=0, t=50)
         )
 
