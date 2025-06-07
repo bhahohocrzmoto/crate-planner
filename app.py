@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template_string, request
 import plotly.graph_objs as go
 from py3dbp import Packer, Bin, Item
 
@@ -9,147 +9,125 @@ def index():
     plot_div = ""
 
     if request.method == "POST":
-        # 1️⃣ Read truck size
-        truck_length = float(request.form["truck_length"]) * (1 if request.form["truck_length_unit"] == "m" else 0.01)
-        truck_width = float(request.form["truck_width"]) * (1 if request.form["truck_width_unit"] == "m" else 0.01)
-        truck_height = float(request.form["truck_height"]) * (1 if request.form["truck_height_unit"] == "m" else 0.01)
+        # Read truck size
+        truck_length = float(request.form.get("truck_length", 10))
+        truck_width = float(request.form.get("truck_width", 10))
+        truck_height = float(request.form.get("truck_height", 10))
 
-        # 2️⃣ Read crates
-        crates = []
-        stack_targets = {}
-        crate_idx = 1
-
-        while True:
-            label_field = f"crate{crate_idx}_label"
-            length_field = f"crate{crate_idx}_length"
-            width_field = f"crate{crate_idx}_width"
-            height_field = f"crate{crate_idx}_height"
-            stackable_field = f"crate{crate_idx}_stackable"
-            target_field = f"crate{crate_idx}_stack_target"
-
-            if label_field not in request.form:
-                break
-
-            label = request.form[label_field]
-            length = float(request.form[length_field]) * (1 if request.form[f"crate{crate_idx}_length_unit"] == "m" else 0.01)
-            width = float(request.form[width_field]) * (1 if request.form[f"crate{crate_idx}_width_unit"] == "m" else 0.01)
-            height = float(request.form[height_field]) * (1 if request.form[f"crate{crate_idx}_height_unit"] == "m" else 0.01)
-            stackable = request.form[stackable_field]
-
-            # Store the crate
-            crates.append({
-                "label": label,
-                "length": length,
-                "width": width,
-                "height": height,
-            })
-
-            # Store stacking target if defined
-            if stackable == "Yes" and target_field in request.form and request.form[target_field]:
-                stack_targets[label] = request.form[target_field]
-                print(f"DEBUG: Crate '{label}' should be stacked on '{request.form[target_field]}'")
-            else:
-                print(f"DEBUG: Crate '{label}' → not stackable")
-
-            crate_idx += 1
-
-        # 3️⃣ Setup Packer
+        # Initialize Packer
         packer = Packer()
+        truck = Bin("Truck", truck_length, truck_width, truck_height, 100000)
+        packer.add_bin(truck)
 
-        truck_bin = Bin("Truck", truck_length, truck_width, truck_height, 10000)
-        packer.add_bin(truck_bin)
+        # Read crates
+        crates = []
+        stack_targets = {}  # map: crate_label → stack_target_label
 
-        for crate in crates:
-            item = Item(
-                crate["label"],
-                crate["length"],
-                crate["width"],
-                crate["height"],
-                1,  # weight
-                0   # updatable
-            )
+        crate_index = 1
+        while True:
+            label_key = f"crate{crate_index}_label"
+            if label_key not in request.form:
+                break  # no more crates
+
+            label = request.form[label_key]
+            length = float(request.form.get(f"crate{crate_index}_length", 1))
+            width = float(request.form.get(f"crate{crate_index}_width", 1))
+            height = float(request.form.get(f"crate{crate_index}_height", 1))
+            stackable = request.form.get(f"crate{crate_index}_stackable", "No")
+            stack_target = request.form.get(f"crate{crate_index}_stack_target", "")
+
+            # Create item
+            item = Item(label, length, width, height, 1)  # weight=1
+            crates.append(item)
+
+            # Remember stacking relation
+            if stackable == "Yes" and stack_target.strip():
+                stack_targets[label] = stack_target.strip()
+
+            crate_index += 1
+
+        # Add all items to packer
+        for item in crates:
             packer.add_item(item)
 
-        # 4️⃣ Pack items
-        packer.pack()
+        # Manual stacking pass
+        label_to_item = {item.name: item for item in crates}
+        positioned = set()
 
-        # 5️⃣ Collect positions
-        crate_positions = {}
-        for item in truck_bin.items:
-            dim = item.get_dimension()  # Correct → returns (length, width, height)
-            crate_positions[item.name] = {
-                "x": item.position[0],
-                "y": item.position[1],
-                "z": item.position[2],
-                "length": dim[0],
-                "width": dim[1],
-                "height": dim[2]
-            }
-            print(f"DEBUG: Packed {item.name} at x={item.position[0]}, y={item.position[1]}, z={item.position[2]} size=({dim[0]}, {dim[1]}, {dim[2]})")
+        for base_label, top_label in stack_targets.items():
+            if base_label in label_to_item and top_label in label_to_item:
+                base = label_to_item[base_label]
+                top = label_to_item[top_label]
 
-        # 6️⃣ Build 3D plot
+                # If base is not positioned yet → place it first at origin
+                if base.name not in positioned:
+                    base.position = (0, 0, 0)
+                    positioned.add(base.name)
+
+                # Place top crate exactly on top of base
+                base_x, base_y, base_z = base.position
+                top.position = (base_x, base_y, base_z + base.height)
+                positioned.add(top.name)
+
+        # Run packer (will respect pre-positioned crates)
+        packer.pack(bigger_first=False)
+
+        # Build Plotly Mesh3D plot
         fig = go.Figure()
 
         # Draw truck
-        fig.add_trace(go.Mesh3d(
-            x=[0, truck_length, truck_length, 0, 0, truck_length, truck_length, 0],
-            y=[0, 0, truck_width, truck_width, 0, 0, truck_width, truck_width],
-            z=[0, 0, 0, 0, truck_height, truck_height, truck_height, truck_height],
-            color='lightgray',
+        truck_shape = dict(
+            x=[0, truck.width, truck.width, 0, 0, truck.width, truck.width, 0],
+            y=[0, 0, truck.length, truck.length, 0, 0, truck.length, truck.length],
+            z=[0, 0, 0, 0, truck.height, truck.height, truck.height, truck.height],
             opacity=0.1,
-            name='Truck',
-            alphahull=0
+            color="gray",
+            name="Truck"
+        )
+        fig.add_trace(go.Mesh3d(
+            x=truck_shape["x"],
+            y=truck_shape["y"],
+            z=truck_shape["z"],
+            opacity=truck_shape["opacity"],
+            color=truck_shape["color"],
+            name=truck_shape["name"]
         ))
 
         # Draw crates
-        colors = ['red', 'blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'brown']
-        color_idx = 0
-
-        for crate in crates:
-            pos = crate_positions.get(crate["label"])
-            if not pos:
-                print(f"WARNING: Crate {crate['label']} was not packed!")
-                continue
-
-            x0, y0, z0 = pos["x"], pos["y"], pos["z"]
-            l, w, h = pos["length"], pos["width"], pos["height"]
+        colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow"]
+        for i, item in enumerate(packer.bins[0].items):
+            x0, y0, z0 = item.position
+            x1 = x0 + item.width
+            y1 = y0 + item.length
+            z1 = z0 + item.height
 
             fig.add_trace(go.Mesh3d(
-                x=[x0, x0 + l, x0 + l, x0, x0, x0 + l, x0 + l, x0],
-                y=[y0, y0, y0 + w, y0 + w, y0, y0, y0 + w, y0 + w],
-                z=[z0, z0, z0, z0, z0 + h, z0 + h, z0 + h, z0 + h],
-                color=colors[color_idx % len(colors)],
-                opacity=0.7,
-                name=crate["label"],
-                alphahull=0
+                x=[x0, x1, x1, x0, x0, x1, x1, x0],
+                y=[y0, y0, y1, y1, y0, y0, y1, y1],
+                z=[z0, z0, z0, z0, z1, z1, z1, z1],
+                opacity=0.8,
+                color=colors[i % len(colors)],
+                name=item.name,
+                text=item.name
             ))
-
-            # Add label text
-            fig.add_trace(go.Scatter3d(
-                x=[x0 + l/2],
-                y=[y0 + w/2],
-                z=[z0 + h/2],
-                mode='text',
-                text=[crate["label"]],
-                textposition='middle center',
-                textfont=dict(size=12, color='black'),
-                showlegend=False
-            ))
-
-            color_idx += 1
 
         fig.update_layout(
             scene=dict(
-                xaxis_title='Length (m)',
-                yaxis_title='Width (m)',
-                zaxis_title='Height (m)',
+                xaxis_title="Width (m)",
+                yaxis_title="Length (m)",
+                zaxis_title="Height (m)"
             ),
-            margin=dict(l=0, r=0, b=0, t=0)
+            margin=dict(l=0, r=0, t=0, b=0)
         )
 
         plot_div = fig.to_html(full_html=False)
 
-    return render_template("index.html", plot_div=plot_div)
+    # Render page
+    with open("templates/index.html", "r") as f:
+        html_template = f.read()
 
+    return render_template_string(html_template, plot_div=plot_div)
+
+# Run app
 if __name__ == "__main__":
     app.run(debug=True)
