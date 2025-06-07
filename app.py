@@ -9,113 +9,98 @@ def index():
     plot_div = ""
 
     if request.method == "POST":
-        # Read truck size with unit conversion
+        # Read truck size
         truck_length = float(request.form.get("truck_length", 10))
-        truck_length_unit = request.form.get("truck_length_unit", "m")
-        if truck_length_unit == "cm":
-            truck_length /= 100.0
-            
         truck_width = float(request.form.get("truck_width", 10))
-        truck_width_unit = request.form.get("truck_width_unit", "m")
-        if truck_width_unit == "cm":
-            truck_width /= 100.0
-            
         truck_height = float(request.form.get("truck_height", 10))
-        truck_height_unit = request.form.get("truck_height_unit", "m")
-        if truck_height_unit == "cm":
-            truck_height /= 100.0
 
         # Initialize Packer
         packer = Packer()
-        truck = Bin("Truck", truck_width, truck_height, truck_length, 100000)
+        truck = Bin("Truck", truck_length, truck_width, truck_height, 100000)
         packer.add_bin(truck)
 
         # Read crates
         crates = []
-        stack_targets = {}
-        stackable_bases = set()  # Track crates that are bases for stacking
+        stack_targets = {}  # map: crate_label → stack_target_label
 
         crate_index = 1
         while True:
             label_key = f"crate{crate_index}_label"
             if label_key not in request.form:
-                break
+                break  # no more crates
 
             label = request.form[label_key]
             length = float(request.form.get(f"crate{crate_index}_length", 1))
-            length_unit = request.form.get(f"crate{crate_index}_length_unit", "m")
-            if length_unit == "cm":
-                length /= 100.0
-                
             width = float(request.form.get(f"crate{crate_index}_width", 1))
-            width_unit = request.form.get(f"crate{crate_index}_width_unit", "m")
-            if width_unit == "cm":
-                width /= 100.0
-                
             height = float(request.form.get(f"crate{crate_index}_height", 1))
-            height_unit = request.form.get(f"crate{crate_index}_height_unit", "m")
-            if height_unit == "cm":
-                height /= 100.0
-                
             stackable = request.form.get(f"crate{crate_index}_stackable", "No")
             stack_target = request.form.get(f"crate{crate_index}_stack_target", "")
 
-            item = Item(label, width, height, length, 1)
+            # Create item
+            item = Item(label, length, width, height, 1)  # weight=1
             crates.append(item)
 
+            # Remember stacking relation
             if stackable == "Yes" and stack_target.strip():
                 stack_targets[label] = stack_target.strip()
-                stackable_bases.add(stack_target.strip())  # Mark base crate
 
             crate_index += 1
 
-        # First: Pack non-stackable items and stack BASE items
-        packer.items = []  # Reset items
+        # Add all items to packer
         for item in crates:
-            # Only pack items that aren't top crates in a stack
-            if item.name not in stack_targets.values():
-                packer.add_item(item)
+            packer.add_item(item)
 
-        # Run initial packing (for base crates and non-stackable items)
-        packer.pack(bigger_first=False)
+        # Manual stacking pass
+        label_to_item = {item.name: item for item in crates}
+        positioned = set()
 
-        # Second: Place stacked items on their bases
-        for top_label, base_label in stack_targets.items():
-            # Find base crate in packed items
-            base_item = next((item for item in packer.bins[0].items if item.name == base_label), None)
-            top_item = next((item for item in crates if item.name == top_label), None)
-            
-            if base_item and top_item:
-                base_x, base_y, base_z = base_item.position
-                # Place top crate directly on base
-                top_item.position = (
-                    base_x, 
-                    base_y, 
-                    base_z + base_item.height
-                )
-                # Add to packed items
-                packer.bins[0].items.append(top_item)
+        for base_label, top_label in stack_targets.items():
+            if base_label in label_to_item and top_label in label_to_item:
+                base = label_to_item[base_label]
+                top = label_to_item[top_label]
+
+                # If base is not positioned yet → place at origin
+                if not hasattr(base, "position"):
+                    base.position = (0, 0, 0)
+                    positioned.add(base.name)
+
+                # Place top crate exactly on top
+                base_x, base_y, base_z = base.position
+                top.position = (base_x, base_y, base_z + base.height)
+                positioned.add(top.name)
+
+        # ❌ IMPORTANT: DO NOT call packer.pack() here
+        # → because it will override positions!
+        # packer.pack(bigger_first=False)
+
+        # For crates that are not stacked at all → place them manually side by side
+        # Example simple logic: place next to previous crate in X direction
+        current_x = 0
+        spacing = 0.5  # gap between crates
+        for item in crates:
+            if not hasattr(item, "position"):
+                item.position = (current_x, 0, 0)
+                current_x += item.width + spacing
 
         # Build Plotly Mesh3D plot
         fig = go.Figure()
 
-        # Draw truck
-        truck_shape = dict(
-            x=[0, truck.width, truck.width, 0, 0, truck.width, truck.width, 0],
-            y=[0, 0, truck.depth, truck.depth, 0, 0, truck.depth, truck.depth],
-            z=[0, 0, 0, 0, truck.height, truck.height, truck.height, truck.height],
+        # Draw truck box
+        fig.add_trace(go.Mesh3d(
+            x=[0, truck_width, truck_width, 0, 0, truck_width, truck_width, 0],
+            y=[0, 0, truck_length, truck_length, 0, 0, truck_length, truck_length],
+            z=[0, 0, 0, 0, truck_height, truck_height, truck_height, truck_height],
             opacity=0.1,
             color="gray",
             name="Truck"
-        )
-        fig.add_trace(go.Mesh3d(**truck_shape))
+        ))
 
-        # Draw crates
+        # Draw crates (using manual positions!)
         colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow"]
-        for i, item in enumerate(packer.bins[0].items):
+        for i, item in enumerate(crates):  # ⚠️ use "crates", not packer.bins[0].items
             x0, y0, z0 = item.position
             x1 = x0 + item.width
-            y1 = y0 + item.depth
+            y1 = y0 + item.length
             z1 = z0 + item.height
 
             fig.add_trace(go.Mesh3d(
@@ -145,5 +130,6 @@ def index():
 
     return render_template_string(html_template, plot_div=plot_div)
 
+# Run app
 if __name__ == "__main__":
     app.run(debug=True)
